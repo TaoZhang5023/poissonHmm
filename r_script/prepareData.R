@@ -3,8 +3,8 @@ library(lubridate)
 library(dplyr)
 
 # Set Variable
-OBS_OUTPUT = "../data/obs_halfyear.csv"
-LENGTH_OUTPUT = "../data/length_halfyear.csv"
+OBS_OUTPUT = "../data/obs_p.csv"
+LENGTH_OUTPUT = "../data/length_p.csv"
 START_DATE = "2000-01-01"
 END_DATE = "2018-12-31"
 DURATION = "182 days"
@@ -15,15 +15,16 @@ date_range <- as.data.frame(start_date)
 rm(start_date)
 
 # Count events for each days
-# raw_data$countP <- rowSums(raw_data[-1] == "P")
-# raw_data$countM <- rowSums(raw_data[-1] == "M")
-# raw_data$countA <- rowSums(raw_data[-1] == "A")
-# raw_data$countE <- rowSums(raw_data[-1] == "E")
-# raw_data$countAE <- raw_data$countA + raw_data$countE
-# raw_data$countA <- NULL
-# raw_data$countE <- NULL
+raw_data$countP <- rowSums(raw_data[-1] == "P")
+raw_data$countM <- rowSums(raw_data[-1] == "M")
+raw_data$countA <- rowSums(raw_data[-1] == "A")
+raw_data$countE <- rowSums(raw_data[-1] == "E")
+raw_data$countAE <- raw_data$countA + raw_data$countE
+raw_data$countA <- NULL
+raw_data$countE <- NULL
 
 # Group the data by DURATION
+raw_data$date <- as.Date(raw_data$date)
 grouped_date <- cut(raw_data$date, breaks = c(date_range$start_date), include.lowest=T)
 grouped_date <- as.data.frame(grouped_date)
 output <- cbind(raw_data, grouped_date)
@@ -32,7 +33,7 @@ output$type <- NULL
 output$date <- as.Date(output$grouped_date)
 output$grouped_date <- NULL
 output <- output %>% group_by(id, date) %>% 
-  summarize(countP=sum(countP), countM=sum(countM), countAE=sum(countAE))
+  dplyr::summarize(countP=sum(countP), countM=sum(countM), countAE=sum(countAE))
 
 # Fill in missing date range
 output <- do.call(
