@@ -1,13 +1,22 @@
 library(magrittr)
 library(lubridate)
 library(dplyr)
+library(data.table)
 
 # Set Variable
-OBS_OUTPUT = "../data/obs_p.csv"
-LENGTH_OUTPUT = "../data/length_p.csv"
+OBS_OUTPUT = "data/obs_6m.csv"
+LENGTH_OUTPUT = "data/length_6m.csv"
 START_DATE = "2000-01-01"
 END_DATE = "2018-12-31"
 DURATION = "182 days"
+
+# Copy data from source data
+raw_data <- Event
+
+# Filter out PN05*, PN06* only and clean data
+ids <- unique(raw_data[raw_data$category2 %like% "P.N0", "id"])
+raw_data <- raw_data[raw_data$id %in% ids, c("id", "type", "date")]
+raw_data <- raw_data[c("id", "type", "date")]
 
 # Create a sequence of dates
 start_date <- seq(as.Date(START_DATE), to=as.Date(END_DATE), by = DURATION)
@@ -22,9 +31,10 @@ raw_data$countE <- rowSums(raw_data[-1] == "E")
 raw_data$countAE <- raw_data$countA + raw_data$countE
 raw_data$countA <- NULL
 raw_data$countE <- NULL
+raw_data$type <- NULL
+raw_data$date <- as.Date(raw_data$date)
 
 # Group the data by DURATION
-raw_data$date <- as.Date(raw_data$date)
 grouped_date <- cut(raw_data$date, breaks = c(date_range$start_date), include.lowest=T)
 grouped_date <- as.data.frame(grouped_date)
 output <- cbind(raw_data, grouped_date)
