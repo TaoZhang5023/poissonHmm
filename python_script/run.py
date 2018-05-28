@@ -2,18 +2,20 @@ import poissonHMM as poissonHMM
 import numpy as np
 import pandas as pd
 from sklearn.externals import joblib
+import matplotlib.pyplot as plt
 
-N_ITER = 500
-N_SPLIT = 3
-N_FEATURE = 2
-LABEL = "6m"
+N_ITER = 200
+N_SPLIT = 5
+N_FEATURE = 16
+N_STATE = 15
+LABEL = "6mh_cate2"
 OBS_FILE = "../data/obs_" + LABEL + ".csv"
 LENGTH_FILE = "../data/length_" + LABEL + ".csv"
 MODEL_NAME = "../model/model_" + LABEL
 
-def read_files(obs_file, length_file):
+def read_files(obs_file = OBS_FILE, length_file = LENGTH_FILE):
     length = pd.read_csv(length_file, sep=',', header=0).values[:,2]
-    obs = pd.read_csv(obs_file, sep=',', header=0).values[:,[3,4]]
+    obs = pd.read_csv(obs_file, sep=',', header=0).values[:,3:]
     return obs,length
 
 def split_data(obs, start_index, end_index):
@@ -42,12 +44,26 @@ def test_correctness(test_data, test_length, model):
                 obs_event.append(test_data[start+j,1])
                 predict_event.append(prob)
         start += test_length[i]
-    correct = 0;
+    # HH, HN, NH, NN
+    matrix = np.zeros(4)
+    H=0
+    N=0
     for i in range(0,len(obs_event)):
-        if ((obs_event[i] > 0) & (predict_event[i] > 0.3)) or ((obs_event[i] == 0) & (predict_event[i] < 0.1)):
-            correct += 1
-    print("correctness_test: ", correct/len(obs_event))
-    correctness_test[N_COMPONENTS-1] += correct/len(obs_event)
+        if (obs_event[i] > 0):
+            H += 1
+            if (predict_event[i] > 0.3):
+                matrix[0] += 1
+            else:
+                matrix[1] += 1
+        else:
+            N += 1
+            if (predict_event[i] > 0.3):
+                matrix[2] += 1
+            else:
+                matrix[3] += 1
+    matrix[:2] = matrix[:2]/H
+    matrix[2:] = matrix[2:]/N
+    correctness_test[N_COMPONENTS-1] += matrix
 
 def train_model(train_data, train_length, i, lamdas_):
     model = poissonHMM.poissonHMM(n_components=N_COMPONENTS, n_iter=N_ITER, lamdas_=lamdas_)
@@ -62,7 +78,7 @@ def validation(train_data, test_data, train_length, test_length, i, lamdas_):
     b = test_data > 80
     test_data[b] = 80
     model = train_model(train_data, train_length, i, lamdas_)
-    Correctness test
+    # Correctness test
     test_correctness(test_data, test_length, model)
     # Train cross validated likelihood
     likelihood = 0-model.score(train_data, train_length)
@@ -103,23 +119,36 @@ def test_model(obs_file=OBS_FILE, length_file=LENGTH_FILE, n_split=N_SPLIT):
         validation(train_data, test_data, train_length, test_length, i, lamdas_)
     print("end")
 
-#main
-# N_COMPONENTS = 20
-# test_model()
-test_cross_validated_likelihood = np.zeros(N_STATE)
-train_cross_validated_likelihood = np.zeros(N_STATE)
-AIC = np.zeros(N_STATE)
-BIC = np.zeros(N_STATE)
-correctness_test = np.zeros(N_STATE)
-for i in range(0,N_STATE):
-    N_COMPONENTS = i+1
-    test_model()
-test_cross_validated_likelihood  = test_cross_validated_likelihood/N_SPLIT
-train_cross_validated_likelihood = train_cross_validated_likelihood/N_SPLIT
-AIC = AIC/N_SPLIT
-BIC = BIC/N_SPLIT
-correctness_test = correctness_test/N_SPLIT
-print('\t\t\t', "correctness_test\t", "test_cvl\t", "train_cvl\t", "AIC\t", "BIC\t")
-for i in range(0, N_STATE):
-    print(i+1,"States:\t", correctness_test[i], '\t', test_cross_validated_likelihood[i], '\t', train_cross_validated_likelihood[i],
-    '\t', AIC[i], '\t', BIC[i])
+def find_best_params():
+    test_cross_validated_likelihood = np.zeros(N_STATE)
+    train_cross_validated_likelihood = np.zeros(N_STATE)
+    AIC = np.zeros(N_STATE)
+    BIC = np.zeros(N_STATE)
+    correctness_test = np.zeros((N_STATE,4))
+    for i in range(0,N_STATE):
+        N_COMPONENTS = i+1
+        test_model()
+    test_cross_validated_likelihood  = test_cross_validated_likelihood/N_SPLIT
+    train_cross_validated_likelihood = train_cross_validated_likelihood/N_SPLIT
+    AIC = AIC/N_SPLIT
+    BIC = BIC/N_SPLIT
+    correctness_test = correctness_test/N_SPLIT
+    print('\t\t\t', "correctness_test\t", "test_cvl\t", "train_cvl\t", "AIC\t", "BIC\t")
+    for i in range(0, N_STATE):
+        print(i+1,"States:\t", correctness_test[i], '\t', test_cross_validated_likelihood[i], '\t', train_cross_validated_likelihood[i],
+        '\t', AIC[i], '\t', BIC[i])
+    line_1, = plt.plot(correctness_test[:,0], label='HH')
+    line_2, = plt.plot(correctness_test[:,1], label='HN')
+    line_3, = plt.plot(correctness_test[:,2], label='NH')
+    line_4, = plt.plot(correctness_test[:,3], label='NN')
+    plt.legend(handles=[line_1, line_2, line_3, line_4])
+    plt.savefig('correctness.png')
+
+N_COMPONENTS=5
+# obs, length = read_files()
+# print("There are ", obs.shape[0], " observations and ", len(length), " patients.")
+# # lengths = np.array_split(length, n_split)
+# lamdas_ = np.random.rand(N_FEATURE, N_COMPONENTS)*10
+# train_model(obs, length, 1, lamdas_)
+
+# find_best_params()
